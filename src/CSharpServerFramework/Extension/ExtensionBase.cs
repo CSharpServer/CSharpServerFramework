@@ -83,7 +83,6 @@ namespace CSharpServerFramework.Extension
             ExtensionName = Extend.ExtensionName;
             MessageDecompressor = Extend.MessageDecompressor;
             Commands = Extend.LoadCommand();
-            Init();
         }
 
         protected object DeserializeMessage(ReceiveMessage Message)
