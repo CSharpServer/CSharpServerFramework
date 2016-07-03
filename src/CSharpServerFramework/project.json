@@ -3,18 +3,7 @@
   "description": "CSharpServerFramework Class Library",
 
   "frameworks": {
-    "net451": {},
-    "netcoreapp1.0": {
-      "dependencies": {
-        "Microsoft.NETCore.App": {
-          "version": "1.0.0",
-          "type": "platform"
-        }
-      }
-    },
-    "netstandard1.0": {
-      "dependencies": { "NETStandard.Library": "1.0.0" }
-    }
+    "net451": {}
   },
   "dependencies": {
     "CSharpServerFrameworkAbstract": "1.0.0-*"
