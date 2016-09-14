@@ -5,6 +5,7 @@
     "netcoreapp1.0": {}
   },
   "dependencies": {
+    "CSharpServerCommon": "1.0.0",
     "CSharpServerFrameworkAbstract": "1.0.0-*",
     "System.Net.Sockets": "4.1.0",
     "System.Net.Http": "4.1.0",
@@ -17,7 +18,8 @@
     "System.Threading.Tasks.Dataflow": "4.6.0",
     "System.Text.Encoding.Extensions": "4.0.11"
   },
+
   "buildOptions": {
-    "define": [ "NETCORE" ]
+    "define": []
   }
 }

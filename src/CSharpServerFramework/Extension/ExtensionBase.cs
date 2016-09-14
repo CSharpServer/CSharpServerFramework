@@ -26,63 +26,20 @@ namespace CSharpServerFramework.Extension
         /// 处理消息委托
         /// </summary>
         /// <param name="User">用户</param>
-        /// <param name="Object">参数</param>
-        protected delegate void ExtensionHandleMessageDelegate(ExtensionBase Extension, ICSharpServerSession Session, object Object, MethodInfo Method);
-
-        /// <summary>
-        /// 异步处理消息方法
-        /// </summary>
-        /// <param name="Extension"></param>
-        /// <param name="Session"></param>
-        /// <param name="Obj"></param>
-        /// <param name="Method"></param>
-        protected static void AsyncMessageHandler(ExtensionBase Extension, ICSharpServerSession Session, object Obj, MethodInfo Method)
-        {
-#if DEV_DEBUG_ASYNC
-            Console.WriteLine("Current Thread:" + System.Threading.Thread.CurrentThread.GetHashCode());
-#endif
-            try
-            {
-                Method.Invoke(Extension.Extend, new object[] { Session, Obj });
-            }
-            catch (Exception ex)
-            {
-                Extension.Log("Async Invoke Method Exception:" + ex.Message);
-            }
-            
-        }
-        /// <summary>
-        /// 异步调用回调函数
-        /// </summary>
-        /// <param name="ar"></param>
-        protected static void AsyncMessageHandlerCallback(IAsyncResult ar)
-        {
-            try
-            {
-                ExtensionHandleMessageDelegate handler = ar.AsyncState as ExtensionHandleMessageDelegate;
-                handler.EndInvoke(ar);
-            }
-            catch (Exception ex)
-            {
-                CSServer.InternalInstance.Logger.Log("Async Handle Message Exception:" + ex);
-            }
-            
-#if DEV_DEBUG_ASYNC
-            Console.WriteLine("Current Thread:" + System.Threading.Thread.CurrentThread.GetHashCode());
-#endif
-        }
+        /// <param name="obj">参数</param>
+        protected delegate void ExtensionHandleMessageDelegate(ExtensionBase extension, ICSharpServerSession session, object obj, MethodInfo method);
 
         /// <summary>
         /// CSharpServer 的Extension基类
         /// </summary>
-        ///<param name="Extend">拓展代理</param>
-        public ExtensionBase(ExtensionBaseEx Extend)
+        ///<param name="extend">拓展代理</param>
+        public ExtensionBase(ExtensionBaseEx extend)
         {
-            this.Extend = Extend;
+            this.Extend = extend;
             this.Extend.ServerExtensionBase = this;
-            ExtensionName = Extend.ExtensionName;
-            MessageDecompressor = Extend.MessageDecompressor;
-            Commands = Extend.LoadCommand();
+            ExtensionName = extend.ExtensionName;
+            MessageDecompressor = extend.MessageDecompressor;
+            Commands = extend.LoadCommand();
         }
 
         protected object DeserializeMessage(ReceiveMessage Message)
@@ -215,19 +172,27 @@ namespace CSharpServerFramework.Extension
                 if (Command.IsAsyncInvoke)
                 {
                     //异步方式调用
-                    ExtensionHandleMessageDelegate handler = new ExtensionHandleMessageDelegate(AsyncMessageHandler);
-                    handler.BeginInvoke(this, Session, data, Command.CommandMethod, AsyncMessageHandlerCallback, handler);
+                    Task.Run(() =>
+                    {
+                        try
+                        {
+                            Command.CommandMethod.Invoke(Extend, new object[] { Session, data });
+                        }
+                        catch (Exception ex)
+                        {
+                            Log("Command Method Async Invoke Exception:" + ex.Message);
+                        }
+                    });
                 }
                 else
                 {
                     //同步方式调用
-                    Command.CommandMethod.Invoke(this, new object[] { Session, data });
+                    Command.CommandMethod.Invoke(Extend, new object[] { Session, data });
                 }
 
             }
             catch (Exception ex)
             {
-
                 throw new ExtensionException("Command Method Invoke Exception:" + ex.Message);
             }
 #if DEV_DEBUG

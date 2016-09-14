@@ -325,7 +325,7 @@ namespace CSharpServerFramework.Message
             }
             catch (Exception ex)
             {
-                Server.Logger.Log("Transform Buffer Exception" + ex.Message);
+                Server.Logger.Log("Transform Buffer Exception " + ex.Message);
                 throw ex;
             }
         }

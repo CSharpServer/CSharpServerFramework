@@ -20,7 +20,7 @@ namespace CSharpServerFramework.Message
         /// </summary>
         internal CSServerClientBase Client { get; set; }
         
-        public SendUserMessage(byte[] Data)
+        public SendUserMessage(byte[] Data):this(Data,Data.Length)
         {
         }
         /// <summary>
