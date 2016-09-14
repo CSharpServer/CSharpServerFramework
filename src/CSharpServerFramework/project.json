@@ -1,11 +1,23 @@
-﻿{
+{
   "version": "1.0.0-*",
   "description": "CSharpServerFramework Class Library",
-
   "frameworks": {
-    "net451": {}
+    "netcoreapp1.0": {}
   },
   "dependencies": {
-    "CSharpServerFrameworkAbstract": "1.0.0-*"
+    "CSharpServerFrameworkAbstract": "1.0.0-*",
+    "System.Net.Sockets": "4.1.0",
+    "System.Net.Http": "4.1.0",
+    "System.Threading.Thread": "4.0.0",
+    "System.Threading.Tasks": "4.0.11",
+    "System.Threading": "4.0.11",
+    "System.Runtime.Extensions": "4.1.0",
+    "System.Collections.Concurrent": "4.0.12",
+    "System.Collections.Immutable": "1.2.0",
+    "System.Threading.Tasks.Dataflow": "4.6.0",
+    "System.Text.Encoding.Extensions": "4.0.11"
+  },
+  "buildOptions": {
+    "define": [ "NETCORE" ]
   }
 }

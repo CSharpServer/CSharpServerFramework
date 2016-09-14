@@ -5,6 +5,8 @@ using System.Text;
 using System.Net.Sockets;
 using System.Threading;
 using System.Net;
+using System.Threading.Tasks.Dataflow;
+using System.Threading.Tasks;
 
 namespace CSharpServerFramework.Util
 {
@@ -54,7 +56,7 @@ namespace CSharpServerFramework.Util
                 _running = false;
                 try
                 {
-                    listenerClient.Close();
+                    listenerClient.Dispose();
                 }
                 catch (Exception)
                 {
@@ -66,24 +68,27 @@ namespace CSharpServerFramework.Util
         {
             UdpClient udpClient = new UdpClient(this._port);
             listenerClient = udpClient;
-            IPEndPoint remoteEndPoint = new IPEndPoint(IPAddress.Loopback, 0);
-            while (_running)
+            Task.Run(async () =>
             {
-                try
+                while (_running)
                 {
-                    byte[] data = udpClient.Receive(ref remoteEndPoint);
-                    string command = UTF8Encoding.UTF8.GetString(data, 0, data.Length);
-                    DoCommand(command);
-                    if (!_running)
+                    try
                     {
-                        break;
+
+                        var a = await udpClient.ReceiveAsync();
+                        string command = UTF8Encoding.UTF8.GetString(a.Buffer, 0, a.Buffer.Length);
+                        DoCommand(command);
+                        if (!_running)
+                        {
+                            break;
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        continue;
                     }
                 }
-                catch (Exception)
-                {
-                    continue;
-                }
-            }
+            });
         }
 
         private void DoCommand(string command)

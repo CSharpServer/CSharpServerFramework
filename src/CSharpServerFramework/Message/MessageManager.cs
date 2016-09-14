@@ -9,6 +9,7 @@ using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace CSharpServerFramework.Message
 {
@@ -124,38 +125,24 @@ namespace CSharpServerFramework.Message
 
         private void ClientSendMessage(SendMessage msg, CSServerClientBase client)
         {
-            try
+            Task.Run(async () =>
             {
-                if(client == null || client.BaseTcpClient == null || client.BaseTcpClient.Client == null || !client.BaseTcpClient.Connected)
+                try
                 {
-                    return;
+                    if (client == null || client.BaseTcpClient == null || client.BaseTcpClient.Client == null || !client.BaseTcpClient.Connected)
+                    {
+                        return;
+                    }
+                    client.BaseTcpClient.Client.SendTimeout = CSServerBaseDefine.TIME_OUT;
+                    var buf = new ArraySegment<byte>(msg.DataBuffer, 0, msg.BufferLength);
+                    var sended = await client.BaseTcpClient.Client.SendAsync(buf, SocketFlags.None);
                 }
-                client.BaseTcpClient.Client.SendTimeout = CSServerBaseDefine.TIME_OUT;
-                client.BaseTcpClient.Client.BeginSend(msg.DataBuffer, 0, msg.BufferLength, SocketFlags.None, OnSendMessageCallback, client);
-            }
-            catch (Exception ex)
-            {
-                Server.Logger.Log("Send Message Exception:" + ex.Message);
-                Server.ClientManager.CheckClientIsDisconnected(client);
-            }
-        }
-
-        private void OnSendMessageCallback(IAsyncResult ar)
-        {
-            CSServerClientBase client = ar.AsyncState as CSServerClientBase;
-            SocketError se;
-            try
-            {
-#if DEV_DEBUG_SEND
-                Server.Logger.Log("Client End Send");
-#endif
-                client.BaseTcpClient.Client.EndSend(ar, out se);
-            }
-            catch (Exception ex)
-            {
-                Server.Logger.Log("Send Message Exception:" + ex.Message);
-                Server.ClientManager.CheckClientIsDisconnected(client);
-            }
+                catch (Exception ex)
+                {
+                    Server.Logger.Log("Send Message Exception:" + ex.Message);
+                    Server.ClientManager.CheckClientIsDisconnected(client);
+                }
+            });
         }
 
         /// <summary>
@@ -182,94 +169,99 @@ namespace CSharpServerFramework.Message
             }            
         }
 
-        /// <summary>
-        /// 包头接收处理
-        /// </summary>
-        /// <param name="ar"></param>
-        private void DoReveivePackageHead(IAsyncResult ar)
-        {
-            MessageAsyncState asyncState = ar.AsyncState as MessageAsyncState;
-            SocketError se = SocketError.TimedOut;
-            CSServerClientBase client = asyncState.State as CSServerClientBase;
-            int len;
-            try
-            {
-                len = client.BaseTcpClient.Client.EndReceive(ar,out se);
-                if (se == SocketError.TimedOut && client.Session.IsSessionNotValidate)
-                {
-                    Server.ClientManager.DisconnectSession(client.Session);
-                    return;
-                }
-                if (TCP_PACKAGE_HEAD_SIZE == len)
-                {
-                    int packLen = BitConverter.ToInt32(client.ReceiveBuffer.Buffer, 0);
-                    ///开始接收实际数据包
-                    ReceiveData(client, asyncState,packLen,out se);
-                }
-                else
-                {
-                    Server.Logger.Log("Server Receive Invalid Head");
-                    Server.ClientManager.CheckClientIsDisconnected(client);
-                }
-            }
-            catch (Exception ex)
-            {
-                Server.Logger.Log("Server Receive Exception:" + ex.Message);
-                Server.Logger.Log("Socket Error:" + se.ToString());
-                Server.ClientManager.CheckClientIsDisconnected(client);
-            }
-        }
 
-        private void ReceiveHead(CSServerClientBase Client,MessageAsyncState AsyncState)
+        private void ReceiveHead(CSServerClientBase client, MessageAsyncState asyncState)
         {
             ///黏包问题解决方法：定义包头，包头代表整一个完整的包的长度
             ///客户端发送数据必须先计算要发送的数据的长度，然后将数据长度作为包头，后连接业务数据，作为完整的一个包发送
             ///接收包头，包头为长度CSServerBaseDefine.TCP_PACKAGE_HEAD_SIZE的byte数组
             ///byte[]数组转换成数字，代表接下来接收的数据长度
-            Client.ReceiveBuffer = Server.BufferManager.GetFreeBuffer();
-            Client.ReceiveBuffer.NextBuffer = null;
-            Client.ReceiveBuffer.TailBuffer = Client.ReceiveBuffer;
-            Client.BaseTcpClient.Client.BeginReceive(
-                Client.ReceiveBuffer.Buffer,
-                0,
-                TCP_PACKAGE_HEAD_SIZE,
-                SocketFlags.None,
-                DoReveivePackageHead,
-                AsyncState);
+            Task.Run(async () =>
+            {
+                client.ReceiveBuffer = Server.BufferManager.GetFreeBuffer();
+                client.ReceiveBuffer.NextBuffer = null;
+                client.ReceiveBuffer.TailBuffer = client.ReceiveBuffer;
+                var a = new ArraySegment<byte>(client.ReceiveBuffer.Buffer, 0, TCP_PACKAGE_HEAD_SIZE);
+                try
+                {
+                    var received = await client.BaseTcpClient.Client.ReceiveAsync(a, SocketFlags.None);
+                    DoReveivePackageHead(received, asyncState);
+                }
+                catch (Exception ex)
+                {
+                    Server.Logger.Log(ex.Message);
+                    if(client.Session.IsSessionNotValidate)
+                    {
+                        Server.ClientManager.DisconnectSession(client.Session);
+                    }
+                }
+            });
         }
 
-        private void ReceiveData(CSServerClientBase Client, MessageAsyncState AsyncState,int LeftDataLen,out SocketError se)
-        {            
-
-            int recvLen;
-            if(LeftDataLen > CSServerBaseDefine.BUFFER_SIZE)
+        /// <summary>
+        /// 包头接收处理
+        /// </summary>
+        /// <param name="ar"></param>
+        private void DoReveivePackageHead(int receivedLength,MessageAsyncState asyncState)
+        {
+            CSServerClientBase client = asyncState.State as CSServerClientBase;
+            if (TCP_PACKAGE_HEAD_SIZE == receivedLength)
             {
-                recvLen = CSServerBaseDefine.BUFFER_SIZE;
-                AsyncState.LeftDataLength = LeftDataLen - CSServerBaseDefine.BUFFER_SIZE;
+                int packLen = BitConverter.ToInt32(client.ReceiveBuffer.Buffer, 0);
+                ///开始接收实际数据包
+                ReceiveData(client, asyncState,packLen);
             }
             else
             {
-                recvLen = LeftDataLen;
-                AsyncState.LeftDataLength = 0;
+                Server.Logger.Log("Server Receive Invalid Head");
+                Server.ClientManager.CheckClientIsDisconnected(client);
             }
-            Client.BaseTcpClient.Client.BeginReceive(Client.ReceiveBuffer.TailBuffer.Buffer, 0, recvLen, SocketFlags.None, out se, DoClientLoopReceiveCallback, AsyncState);
+        }
+
+        private void ReceiveData(CSServerClientBase client, MessageAsyncState AsyncState,int LeftDataLen)
+        {
+            Task.Run(async () =>
+            {
+                int recvLen;
+                if (LeftDataLen > CSServerBaseDefine.BUFFER_SIZE)
+                {
+                    recvLen = CSServerBaseDefine.BUFFER_SIZE;
+                    AsyncState.LeftDataLength = LeftDataLen - CSServerBaseDefine.BUFFER_SIZE;
+                }
+                else
+                {
+                    recvLen = LeftDataLen;
+                    AsyncState.LeftDataLength = 0;
+                }
+                try
+                {
+
+                    var buf = new ArraySegment<byte>(client.ReceiveBuffer.TailBuffer.Buffer, 0, recvLen);
+                    var received = await client.BaseTcpClient.Client.ReceiveAsync(buf, SocketFlags.None);
+                    DoClientLoopReceiveCallback(received, AsyncState);
+                }
+                catch (Exception ex)
+                {
+                    Server.Logger.Log(ex.Message);
+                    if (client.Session.IsSessionNotValidate)
+                    {
+                        Server.ClientManager.DisconnectSession(client.Session);
+                    }
+                }
+            });
         }
 
         /// <summary>
         /// 实际数据包接收处理
         /// </summary>
         /// <param name="ar"></param>
-        protected void DoClientLoopReceiveCallback(IAsyncResult ar)
+        protected void DoClientLoopReceiveCallback(int received,MessageAsyncState asyncState)
         {
             try
             {
-                MessageAsyncState asyncState = ar.AsyncState as MessageAsyncState;
                 CSServerClientBase client = asyncState.State as CSServerClientBase;
-                SocketError se;
-                int len;
+                int len = received;
                 CSServerBuffer tmpBuffer = null;
-
-                len = client.BaseTcpClient.Client.EndReceive(ar, out se);
 #if DEV_DEBUG
                 CSServerBaseDefine.ReceiveMessageTick = DateTime.UtcNow.Ticks;
                 Server.Logger.Log("Receive Time:" + CSServerBaseDefine.ReceiveMessageTick);
@@ -294,14 +286,13 @@ namespace CSharpServerFramework.Message
                             client.ReceiveBuffer.TailBuffer.NextBuffer = Server.BufferManager.GetFreeBuffer();
                             client.ReceiveBuffer.TailBuffer = client.ReceiveBuffer.TailBuffer.NextBuffer;
                         }
-                        ReceiveData(client, asyncState, asyncState.LeftDataLength, out se);
+                        ReceiveData(client, asyncState, asyncState.LeftDataLength);
                     }                                     
                 }
                 else
                 {
                     Server.Logger.Log("Client Loop Receive Exception:Nothing");
                     Server.ClientManager.CheckClientIsDisconnected(client);
-                    return;
                 }
             }
             catch (Exception ex)

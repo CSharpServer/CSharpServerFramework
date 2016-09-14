@@ -37,7 +37,7 @@ namespace CSharpServerFramework.Client
         {
             ReceiveBuffer = null;
 			BaseTcpClient.Client.Dispose ();
-            BaseTcpClient.Close();
+            BaseTcpClient.Dispose();
         }
     }
 }

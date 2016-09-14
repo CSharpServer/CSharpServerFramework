@@ -83,7 +83,7 @@ namespace CSharpServerFramework.Util
             var list = Handler.GetInvocationList();
             foreach (var item in list)
             {
-                item.Method.Invoke(null, new object[] { Sender, Args });
+                item.DynamicInvoke(null, new object[] { Sender, Args });
             }
         }
     }

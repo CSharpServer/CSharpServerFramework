@@ -36,37 +36,41 @@ namespace CSharpServerFramework.Extension
             ExtensionMap = new Dictionary<string, ICSharpServerExtension>();
         }
 
-        public static IList<ICSharpServerExtension> CreateExtensionsFromFile(string ExtensionFileName)
-        {
-            List<ICSharpServerExtension> result = new List<ICSharpServerExtension>();
-            var assembly = Assembly.LoadFile(ExtensionFileName);
-            var definedTypes = assembly.GetTypes();
-            foreach (var type in definedTypes)
+        #region OldVersionCode
+        /*
+            public static IList<ICSharpServerExtension> CreateExtensionsFromFile(string ExtensionFileName)
             {
-                if (type.IsSubclassOf(typeof(ICSharpServerExtension)))
+                List<ICSharpServerExtension> result = new List<ICSharpServerExtension>();
+                var assembly = Assembly.LoadFile(ExtensionFileName);
+                var definedTypes = assembly.GetTypes();
+                foreach (var type in definedTypes)
                 {
-                    ICSharpServerExtension extension = assembly.CreateInstance(type.FullName) as ICSharpServerExtension;
-                    result.Add(extension);
+                    if (type.IsSubclassOf(typeof(ICSharpServerExtension)))
+                    {
+                        ICSharpServerExtension extension = assembly.CreateInstance(type.FullName) as ICSharpServerExtension;
+                        result.Add(extension);
+                    }
                 }
+                return result;
             }
-            return result;
-        }
 
-        public static ICSharpServerExtension CreateExtensionFromFile(string ExtensionFileName,string ExtensionClassName,object[] ConstructorArgs = null)
-        {
-            ICSharpServerExtension extension = null;
-            var assembly = Assembly.LoadFile(ExtensionFileName);
+            public static ICSharpServerExtension CreateExtensionFromFile(string ExtensionFileName,string ExtensionClassName,object[] ConstructorArgs = null)
+            {
+                ICSharpServerExtension extension = null;
+                var assembly = Assembly.LoadFile(ExtensionFileName);
             
-            if(ConstructorArgs == null)
-            {
-                extension = assembly.CreateInstance(ExtensionClassName) as ICSharpServerExtension;
+                if(ConstructorArgs == null)
+                {
+                    extension = assembly.CreateInstance(ExtensionClassName) as ICSharpServerExtension;
+                }
+                else
+                {
+                    extension = assembly.CreateInstance(ExtensionClassName, false, BindingFlags.CreateInstance, null, ConstructorArgs, null, null) as ICSharpServerExtension;
+                }
+                return extension;
             }
-            else
-            {
-                extension = assembly.CreateInstance(ExtensionClassName, false, BindingFlags.CreateInstance, null, ConstructorArgs, null, null) as ICSharpServerExtension;
-            }
-            return extension;
-        }
+             */
+        #endregion
 
         public void RegistExtension(ICSharpServerExtension Extension)
         {
@@ -79,7 +83,7 @@ namespace CSharpServerFramework.Extension
                 ExtensionBase extension = null;
                 if (Extension is ExtensionBaseEx)
                 {
-                    var attr = Attribute.GetCustomAttribute(Extension.GetType(), typeof(ValidateExtensionAttribute));
+                    var attr = Extension.GetType().GetTypeInfo().GetCustomAttribute<ValidateExtensionAttribute>();
                     if (attr != null)
                     {
                         if (ValidateExtensions == null)
